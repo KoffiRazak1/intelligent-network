@@ -308,6 +308,97 @@ class CaptureManager:
         logger.info("Capture démarrée sur l'interface %s", interface.name)
         return self.get_status()
 
+    def import_summaries(
+        self,
+        filename: str,
+        summaries: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Archive et analyse les résumés extraits d'un fichier PCAP importé."""
+        if not summaries:
+            raise ValueError("Le fichier de capture ne contient aucun paquet lisible.")
+
+        with self._lock:
+            if self._state["status"] in {"STARTING", "RUNNING", "STOPPING"}:
+                raise CaptureAlreadyActive(
+                    "Arrête la capture en cours avant d’importer un fichier."
+                )
+
+            self._recent_packets.clear()
+            self._recent_alerts.clear()
+            self._flow_tracker.clear()
+            self._alert_detector.clear()
+            started_at = datetime.now(timezone.utc).isoformat()
+            self._state = {
+                "status": "STARTING",
+                "session_id": None,
+                "interface_id": "pcap-upload",
+                "interface_name": filename,
+                "packet_count": 0,
+                "bytes_captured": 0,
+                "started_at": started_at,
+                "message": "Analyse du fichier de capture…",
+            }
+            self._started_monotonic = time.monotonic()
+
+        with self._archive_lock:
+            self._pending_archive_packets.clear()
+            self._archive_sequence = 0
+
+        try:
+            session_id = self._history_store.create_session(
+                interface_id="pcap-upload",
+                interface_name=filename,
+                started_at=started_at,
+            )
+        except Exception:
+            logger.exception("Impossible de créer la session d’import PCAP.")
+            with self._lock:
+                self._state["status"] = "ERROR"
+                self._state["message"] = (
+                    "Impossible d'enregistrer cette analyse dans l'historique."
+                )
+                self._started_monotonic = None
+            raise
+
+        with self._lock:
+            self._current_session_id = session_id
+            self._state["session_id"] = session_id
+
+        try:
+            for summary in summaries:
+                packet_size = int(summary.get("packet_length_bytes") or 0)
+                with self._lock:
+                    self._state["packet_count"] += 1
+                    self._state["bytes_captured"] += packet_size
+                    self._recent_packets.appendleft(summary)
+
+                self._archive_packet(session_id, summary)
+                self._flow_tracker.add_packet(summary)
+                alert = self._alert_detector.inspect_packet(summary)
+                if alert is not None:
+                    with self._lock:
+                        self._recent_alerts.appendleft(alert)
+
+            self._finish_history_session(session_id, "STOPPED")
+        except Exception:
+            logger.exception("Échec de l’analyse du fichier PCAP importé.")
+            self._finish_history_session(session_id, "ERROR")
+            with self._lock:
+                self._state["status"] = "ERROR"
+                self._state["message"] = "L’analyse du fichier de capture a échoué."
+                self._current_session_id = None
+                self._started_monotonic = None
+            raise
+
+        with self._lock:
+            self._state["status"] = "STOPPED"
+            self._state["message"] = "Fichier de capture analysé."
+            self._current_session_id = None
+            self._started_monotonic = None
+            self._sniffer = None
+
+        return self.get_status()
+
     def stop(self) -> dict[str, Any]:
         """Arrête la capture et retourne son dernier état."""
         with self._lock:

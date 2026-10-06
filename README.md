@@ -5,12 +5,12 @@ Tableau de bord FastAPI pour observer et analyser des résumés de trafic résea
 ## État actuel et limites à connaître
 
 - **Exécution locale Windows :** la capture Scapy utilise les interfaces que Windows/Npcap expose à l’application. Exécuter le serveur avec les permissions requises et installer Npcap si Scapy ne voit pas l’interface.
-- **Railway :** le tableau de bord et son API peuvent être hébergés. Une instance Railway ne peut pas lire la carte Wi-Fi de ton PC : la capture est donc désactivée dans l’image cloud (`CAPTURE_ENABLED=false`). L’interface réseau et les nouvelles captures locales ne fonctionneront pas dans Railway tant qu’un agent installé sur le PC n’aura pas été développé pour transmettre ses résumés au service.
+- **Railway :** le tableau de bord peut être hébergé, mais le navigateur d’un utilisateur ne donne pas au site accès à sa carte Wi-Fi ni aux paquets des autres applications. La capture Scapy est donc désactivée dans l’image cloud (`CAPTURE_ENABLED=false`). La version actuelle n’ingère pas encore des captures externes.
 - **Accès public :** l’application exige HTTP Basic Auth lorsque `APP_ENV=production`. Configure un nom d’utilisateur et un mot de passe forts dans les variables Railway. `/api/health` est la seule route publique, pour le contrôle de santé Railway.
 - **Persistance :** SQLite est configuré via `DATABASE_PATH`. Dans Railway, attache un volume au chemin `/app/data` et configure `DATABASE_PATH=/app/data/network_analyzer.db`. Sans volume, l’historique ne survivra pas aux redéploiements.
 - **Échelle :** l’historique est SQLite sur un seul disque local persistant. Garde une seule instance/réplique Railway pour le moment ; plusieurs répliques ne partageraient pas la même base SQLite.
 
-Le déploiement Railway prévu ici est un tableau de bord privé et persistant, pas une sonde de capture du réseau de ton ordinateur. Ne présente pas les données vides du service cloud comme une capture réelle.
+Le déploiement Railway peut servir l’application en ligne, mais pour analyser des données réelles, il faut une source de trafic. Sans installer de logiciel sur le PC utilisateur, les voies possibles sont le téléversement d’un fichier de capture (`.pcap`/`.pcapng`) dans le navigateur ou la réception de flux exportés par un routeur/pare-feu configuré. Ces fonctions ne sont pas encore implémentées. Un site web seul ne peut pas capturer tout le trafic réseau d’un visiteur.
 
 ## Fonctions en place
 
@@ -161,9 +161,15 @@ Le déploiement est configuré avec `Dockerfile` et `railway.json`. Le CLI Railw
 
 Si tu préfères un déploiement automatique depuis GitHub, crée un dépôt privé, pousse le contenu et connecte-le comme source Railway. Le dépôt local est initialisé sur la branche `main` et les fichiers sont préparés dans l’index, mais aucun commit ni envoi distant n’a été effectué.
 
-### Ce que Railway ne fera pas dans cette version
+### Source de trafic pour un service en ligne
 
-Un conteneur Railway n’a pas accès à la carte réseau locale Intel Wi-Fi du PC. `CAPTURE_ENABLED=false` empêche donc de présenter les interfaces virtuelles du conteneur comme si c’était la carte du PC. Pour avoir de vraies captures dans le tableau de bord hébergé, il reste à développer et sécuriser un agent Windows local qui envoie les résumés via une API authentifiée/TLS. Ne mets pas `CAPTURE_ENABLED=true` sur Railway en espérant capturer le trafic de ton PC.
+L’import est exposé par la route POST /api/capture/import et attend un fichier dans le champ multipart nommé file.
+
+Le tableau de bord en ligne ne peut pas écouter directement la carte Wi-Fi ou le réseau local d'un visiteur depuis son navigateur. Pour utiliser l'analyse sans installer de logiciel, l'utilisateur peut importer depuis la page un fichier PCAP ou PCAPNG déjà obtenu. Le serveur extrait les résumés, les communications et les alertes, puis conserve les paquets résumés dans l'historique ; le contenu applicatif n'est pas conservé. L'import est limité à 25 Mo et 50 000 paquets par fichier.
+
+La capture directe depuis une interface reste réservée à un déploiement local avec les permissions système nécessaires. Une analyse continue en ligne sans installation sur le poste nécessite une source compatible sur le réseau, par exemple un routeur ou pare-feu configuré pour exporter des flux ; cette intégration n'est pas encore implémentée.
+
+L'application actuelle utilise une authentification Basic commune au service et une base partagée : les utilisateurs autorisés voient donc le même tableau de bord et les mêmes données. Des comptes individuels et une séparation des données par utilisateur restent nécessaires avant de l'ouvrir à des clients distincts.
 
 ## Sécurité et données
 
@@ -175,3 +181,5 @@ Un conteneur Railway n’a pas accès à la carte réseau locale Intel Wi-Fi du 
 
 
 Créé par Mr KOFFI ABDOUL-RAZAK.
+#   i n t e l l i g e n t - n e t w o r k - p a c k e t  
+ 

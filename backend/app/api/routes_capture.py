@@ -3,9 +3,10 @@
 import csv
 import io
 import logging
+from pathlib import PurePosixPath
 from collections.abc import Iterator
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -19,17 +20,105 @@ from app.capture.packet_capture import (
     InterfaceSelectionError,
     capture_manager,
 )
+from app.analysis.packet_parser import parse_packet
 from app.config import get_settings
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Capture"])
+MAX_PCAP_BYTES = 25 * 1024 * 1024
+MAX_PCAP_PACKETS = 50_000
 
 
 class StartCaptureRequest(BaseModel):
     """Données nécessaires pour démarrer une capture."""
 
     interface_id: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/capture/import")
+def import_capture(file: UploadFile = File(...)) -> dict:
+    """Analyse un fichier PCAP/PCAPNG fourni par l'utilisateur."""
+    if capture_manager.get_status()["status"] in {
+        "STARTING",
+        "RUNNING",
+        "STOPPING",
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="Arrête la capture en cours avant d’importer un fichier.",
+        )
+
+    filename = PurePosixPath((file.filename or "capture.pcap").replace("\\", "/")).name
+    if not filename.lower().endswith((".pcap", ".pcapng")):
+        raise HTTPException(
+            status_code=415,
+            detail="Choisis un fichier .pcap ou .pcapng.",
+        )
+
+    try:
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+    except (OSError, AttributeError) as error:
+        raise HTTPException(status_code=400, detail="Fichier illisible.") from error
+
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="Le fichier est vide.")
+    if file_size > MAX_PCAP_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Le fichier dépasse la limite de 25 Mo.",
+        )
+
+    try:
+        from scapy.utils import PcapReader
+
+        summaries = []
+        with PcapReader(file.file) as reader:
+            for packet in reader:
+                if len(summaries) >= MAX_PCAP_PACKETS:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="Le fichier dépasse la limite de 50 000 paquets.",
+                    )
+                summaries.append(parse_packet(packet))
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.info("Fichier de capture refusé (%s).", type(error).__name__)
+        raise HTTPException(
+            status_code=422,
+            detail="Le fichier n'est pas une capture PCAP/PCAPNG valide.",
+        ) from error
+    finally:
+        file.file.close()
+
+    if not summaries:
+        raise HTTPException(
+            status_code=422,
+            detail="La capture ne contient aucun paquet analysable.",
+        )
+
+    try:
+        status = capture_manager.import_summaries(filename, summaries)
+    except CaptureAlreadyActive as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except Exception as error:
+        logger.exception("Impossible d'analyser le fichier de capture importé.")
+        raise HTTPException(
+            status_code=503,
+            detail="L'analyse a échoué côté serveur.",
+        ) from error
+
+    return {
+        "message": "Capture analysée.",
+        "session_id": status.get("session_id"),
+        "packet_count": status["packet_count"],
+        "bytes_captured": status["bytes_captured"],
+    }
 
 
 @router.get("/interfaces")

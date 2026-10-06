@@ -49,6 +49,40 @@
   </p>
 </section>
 
+<section class="panel pcap-import" aria-labelledby="pcap-import-title">
+  <div>
+    <p class="eyebrow">ANALYSE EN LIGNE</p>
+    <h2 id="pcap-import-title">Analyser une capture</h2>
+    <p class="muted">
+      Sélectionne un fichier PCAP ou PCAPNG depuis ton appareil. Aucun logiciel
+      NetGuard à installer. Taille maximale : 25 Mo et 50 000 paquets.
+    </p>
+  </div>
+
+  <div class="pcap-import__controls">
+    <label class="packet-filters__field" for="pcap-file">
+      <span>Fichier de capture</span>
+      <input
+        id="pcap-file"
+        type="file"
+        accept=".pcap,.pcapng,application/vnd.tcpdump.pcap,application/x-pcapng"
+      >
+    </label>
+    <button class="start-button" id="import-pcap" type="button" disabled>
+      Importer et analyser
+    </button>
+  </div>
+
+  <p
+    class="interface-message"
+    id="pcap-import-message"
+    role="status"
+    aria-live="polite"
+  >
+    Les résumés seront ajoutés aux tableaux et à l’historique de cette application.
+  </p>
+</section>
+
 <section class="metrics" aria-label="Indicateurs réseau">
   <article class="card">
     <p>PAQUETS OBSERVÉS</p>

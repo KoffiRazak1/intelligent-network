@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const refreshButton = byId("refresh-interfaces");
   const startButton = byId("start-capture");
   const stopButton = byId("stop-capture");
+  const pcapFile = byId("pcap-file");
+  const importPcapButton = byId("import-pcap");
+  const pcapImportMessage = byId("pcap-import-message");
 
   const captureState = byId("capture-state");
   const captureInterface = byId("capture-interface");
@@ -1840,6 +1843,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
   select.addEventListener("change", updateButtons);
   refreshButton.addEventListener("click", loadInterfaces);
+
+  pcapFile?.addEventListener("change", () => {
+    const file = pcapFile.files?.[0];
+    const validExtension = file && /\.(pcap|pcapng)$/i.test(file.name);
+    const validSize = file && file.size > 0 && file.size <= 25 * 1024 * 1024;
+
+    if (importPcapButton) {
+      importPcapButton.disabled = !(validExtension && validSize);
+    }
+
+    if (!pcapImportMessage) return;
+    if (!file) {
+      pcapImportMessage.textContent = "Choisis un fichier PCAP ou PCAPNG.";
+    } else if (!validExtension) {
+      pcapImportMessage.textContent =
+        "Format non pris en charge. Sélectionne un fichier .pcap ou .pcapng.";
+    } else if (!validSize) {
+      pcapImportMessage.textContent =
+        "Le fichier doit faire entre 1 octet et 25 Mo.";
+    } else {
+      pcapImportMessage.textContent =
+        file.name + " prêt à être importé (" + formatBytes(file.size) + ").";
+    }
+  });
+
+  importPcapButton?.addEventListener("click", async () => {
+    const file = pcapFile?.files?.[0];
+    if (!file) return;
+
+    importPcapButton.disabled = true;
+    if (pcapImportMessage) {
+      pcapImportMessage.textContent =
+        "Envoi et analyse en cours. Garde cette page ouverte…";
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await requestJson("/api/capture/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      chartHistory.length = 0;
+      previousBytes = null;
+      if (pcapImportMessage) {
+        pcapImportMessage.textContent =
+          formatNumber(result.packet_count) +
+          " paquet(s) analysé(s) depuis " +
+          file.name +
+          ". Résumés ajoutés aux tableaux et à l’historique.";
+      }
+
+      await refreshStatus();
+      await refreshPackets();
+      await refreshFlows();
+      await refreshAlerts();
+      await refreshHistory();
+    } catch (error) {
+      if (pcapImportMessage) {
+        pcapImportMessage.textContent = "Échec de l’import : " + error.message;
+      }
+    } finally {
+      importPcapButton.disabled = !pcapFile?.files?.length;
+    }
+  });
 
   packetSearch?.addEventListener("input", displayPackets);
   packetProtocol?.addEventListener("change", displayPackets);

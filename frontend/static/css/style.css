@@ -980,3 +980,49 @@ a {
 #flows {
   scroll-margin-top: 24px;
 }
+
+.pcap-import {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pcap-import h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.pcap-import .muted {
+  margin: 5px 0 0;
+  font-size: 11px;
+}
+
+.pcap-import__controls {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.pcap-import__controls input[type="file"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(9, 23, 32, 0.8);
+  font: inherit;
+}
+
+.pcap-import__controls .start-button {
+  min-height: 44px;
+}
+
+@media (max-width: 650px) {
+  .pcap-import__controls {
+    grid-template-columns: 1fr;
+  }
+}
