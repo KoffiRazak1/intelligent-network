@@ -1,0 +1,1 @@
+"""Stockage persistant de l'application."""

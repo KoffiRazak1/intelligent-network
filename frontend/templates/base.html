@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111b">
+  <title>{{ app_name }}</title>
+
+  <link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for('static', path='/images/tiger-cyber-background.png') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', path='/css/style.css') }}"
+  >
+  <script
+    src="{{ url_for('static', path='/js/dashboard.js') }}"
+    defer
+  ></script>
+</head>
+
+<body>
+  <div class="splash" id="splash" role="status">
+    <img
+      class="splash__logo"
+      src="{{ url_for('static', path='/images/tiger-cyber-background.png') }}"
+      alt=""
+    >
+    <p class="eyebrow">SURVEILLANCE RÉSEAU</p>
+    <h1>{{ app_name }}</h1>
+    <span class="loader" aria-hidden="true"></span>
+  </div>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="{{ app_name }} — accueil">
+        <img
+          class="brand__logo"
+          src="{{ url_for('static', path='/images/tiger-cyber-background.png') }}"
+          alt=""
+        >
+        <span>
+          <strong>NETGUARD</strong>
+          <small>ANALYSEUR RÉSEAU</small>
+        </span>
+      </a>
+
+      <p class="nav-title">ESPACE ANALYSTE</p>
+
+      <nav class="nav">
+        <a
+          class="nav__link nav__link--active"
+          href="/"
+          aria-current="page"
+        >
+          <span>◈</span> Vue d’ensemble
+        </a>
+
+        <a class="nav__link" href="/#packets">
+          <span>▤</span> Paquets
+        </a>
+
+        <a class="nav__link" href="/#flows">
+          <span>⇄</span> Communications
+        </a>
+
+        <a class="nav__link" href="/#alerts">
+          <span>△</span> Alertes
+        </a>
+
+        <a class="nav__link" href="/#history">
+          <span>◷</span> Historique
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <span class="dot"></span> Analyse locale
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <span>ESPACE ANALYSTE <b>/</b> Vue d’ensemble</span>
+        <span class="local-badge">
+          <i class="dot"></i> ENVIRONNEMENT LOCAL
+        </span>
+      </header>
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

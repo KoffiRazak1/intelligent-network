@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="welcome">
+  <div>
+    <p class="eyebrow">CENTRE DE SUPERVISION</p>
+    <h1>Bonjour, <span>analyste.</span></h1>
+    <p class="muted">Observe ton réseau. Comprends chaque signal.</p>
+  </div>
+
+  <div class="capture-status">
+    <span class="status-dot" id="capture-status-dot"></span>
+    <div>
+      <strong id="capture-state">Capture inactive</strong>
+      <small id="capture-interface">Aucune interface sélectionnée</small>
+    </div>
+  </div>
+</section>
+
+<section class="panel interface-panel" aria-labelledby="interface-title">
+  <div>
+    <p class="eyebrow">CONFIGURATION</p>
+    <h2 id="interface-title">Interface réseau</h2>
+    <p class="muted">Choisis une interface que tu es autorisé à analyser.</p>
+  </div>
+
+  <div class="interface-controls">
+    <select id="interface-select" disabled aria-label="Choisir une interface réseau">
+      <option value="">Chargement des interfaces…</option>
+    </select>
+
+    <button class="refresh-button" id="refresh-interfaces" type="button">
+      Actualiser
+    </button>
+  </div>
+
+  <div class="capture-actions">
+    <button class="start-button" id="start-capture" type="button" disabled>
+      Démarrer la capture
+    </button>
+
+    <button class="stop-button" id="stop-capture" type="button" disabled>
+      Arrêter
+    </button>
+  </div>
+
+  <p class="interface-message" id="interface-message" role="status" aria-live="polite">
+    Recherche des interfaces réseau…
+  </p>
+</section>
+
+<section class="metrics" aria-label="Indicateurs réseau">
+  <article class="card">
+    <p>PAQUETS OBSERVÉS</p>
+    <strong id="packets-value">—</strong>
+    <small>Session actuelle</small>
+  </article>
+
+  <article class="card">
+    <p>COMMUNICATIONS</p>
+    <strong id="flows-value">—</strong>
+    <small>Communications récentes chargées</small>
+  </article>
+
+  <article class="card">
+    <p>VOLUME OBSERVÉ</p>
+    <strong id="traffic-value">—</strong>
+    <small>Session actuelle</small>
+  </article>
+
+  <article class="card">
+    <p>ALERTES</p>
+    <strong id="alerts-value">0</strong>
+    <small>Alertes récentes à examiner</small>
+  </article>
+</section>
+
+<section class="panels">
+  <article class="panel traffic">
+    <p class="eyebrow">ACTIVITÉ DU RÉSEAU</p>
+    <h2>Trafic en temps réel</h2>
+
+    <div class="traffic-chart-wrap">
+      <canvas
+        id="traffic-chart"
+        role="img"
+        aria-label="Graphique du débit réseau en temps réel"
+      >
+        Le graphique du trafic réseau apparaîtra pendant une capture.
+      </canvas>
+    </div>
+
+    <div class="traffic-chart-footer">
+      <span class="traffic-chart-label">
+        <span class="traffic-chart-dot" aria-hidden="true"></span>
+        Débit réseau
+      </span>
+      <strong id="traffic-rate">—</strong>
+    </div>
+
+    <p
+      class="traffic-chart-message"
+      id="traffic-chart-message"
+      role="status"
+      aria-live="polite"
+    >
+      Le débit apparaîtra pendant une capture.
+    </p>
+  </article>
+
+  <article class="panel">
+    <p class="eyebrow">RÉPARTITION</p>
+    <h2>Protocoles</h2>
+
+    <div id="protocol-breakdown" class="protocol-breakdown" aria-live="polite">
+      <div class="empty-state">
+        <span class="protocol-ring">—</span>
+        <strong>Pas encore de données</strong>
+        <small>La répartition apparaîtra pendant ou après une capture.</small>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="panel recent" id="packets">
+  <p class="eyebrow">OBSERVATIONS</p>
+  <h2>Paquets récemment observés</h2>
+
+  <div class="packet-filters">
+    <label class="packet-filters__field" for="packet-search">
+      <span>Recherche</span>
+      <input
+        id="packet-search"
+        type="search"
+        placeholder="Adresse IP, port ou indicateur TCP…"
+        autocomplete="off"
+      >
+    </label>
+
+    <label class="packet-filters__field" for="packet-protocol">
+      <span>Protocole</span>
+      <select id="packet-protocol">
+        <option value="">Tous les protocoles</option>
+      </select>
+    </label>
+
+    <button
+      class="refresh-button packet-filters__clear"
+      id="clear-packet-filters"
+      type="button"
+    >
+      Réinitialiser
+    </button>
+  </div>
+
+  <p
+    class="packet-results-count"
+    id="packet-results-count"
+    role="status"
+    aria-live="polite"
+  >
+    Chargement des paquets…
+  </p>
+
+  <button class="refresh-button" id="export-packets" type="button" disabled>
+    Exporter les paquets en CSV
+  </button>
+
+  <div class="table-wrap">
+    <table class="packet-table" aria-label="Paquets récemment observés">
+      <thead>
+        <tr>
+          <th>HEURE</th>
+          <th>SOURCE</th>
+          <th>DESTINATION</th>
+          <th>PROTOCOLE</th>
+          <th>INDICATEURS TCP</th>
+          <th>TAILLE</th>
+        </tr>
+      </thead>
+      <tbody id="packets-body">
+        <tr>
+          <td colspan="6" class="table-empty">
+            En attente de paquets observés.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    Seuls les résumés sont affichés. Le contenu des paquets n’est pas conservé.
+  </p>
+</section>
+
+<section class="panel recent flows-panel" id="flows">
+  <p class="eyebrow">COMMUNICATIONS</p>
+  <h2>Communications réseau</h2>
+  <p class="muted">
+    Échanges regroupés par adresses, ports et protocole.
+  </p>
+
+  <div class="packet-filters flow-filters">
+    <label class="packet-filters__field" for="flow-search">
+      <span>Recherche</span>
+      <input
+        id="flow-search"
+        type="search"
+        placeholder="Adresse IP ou port…"
+        autocomplete="off"
+      >
+    </label>
+
+    <label class="packet-filters__field" for="flow-protocol">
+      <span>Protocole</span>
+      <select id="flow-protocol">
+        <option value="">Tous les protocoles</option>
+      </select>
+    </label>
+
+    <button
+      class="refresh-button packet-filters__clear"
+      id="clear-flow-filters"
+      type="button"
+    >
+      Réinitialiser
+    </button>
+  </div>
+
+  <p
+    class="packet-results-count"
+    id="flow-results-count"
+    role="status"
+    aria-live="polite"
+  >
+    Chargement des communications…
+  </p>
+
+  <button class="refresh-button" id="export-flows" type="button" disabled>
+    Exporter en CSV
+  </button>
+
+  <div class="table-wrap">
+    <table
+      class="packet-table flow-table"
+      aria-label="Communications réseau regroupées"
+    >
+      <thead>
+        <tr>
+          <th>DERNIÈRE ACTIVITÉ</th>
+          <th>EXTRÉMITÉ A</th>
+          <th>EXTRÉMITÉ B</th>
+          <th>PROTOCOLE</th>
+          <th>PAQUETS</th>
+          <th>VOLUME</th>
+        </tr>
+      </thead>
+      <tbody id="flows-body">
+        <tr>
+          <td colspan="6" class="table-empty">
+            En attente de communications réseau.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    Clique sur une ligne pour afficher les détails de la communication.
+  </p>
+</section>
+
+<section class="panel recent alerts-panel" id="alerts">
+  <p class="eyebrow">SURVEILLANCE</p>
+  <h2>Alertes à examiner</h2>
+  <p class="muted">
+    Une alerte signale une activité à vérifier ; elle ne prouve pas à elle seule
+    qu’une attaque a eu lieu.
+  </p>
+
+  <div class="table-wrap">
+    <table class="packet-table alert-table" aria-label="Alertes réseau">
+      <thead>
+        <tr>
+          <th>HEURE</th>
+          <th>NIVEAU</th>
+          <th>DÉTECTION</th>
+          <th>SOURCE</th>
+          <th>CIBLE</th>
+          <th>ÉTAT</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-body">
+        <tr>
+          <td colspan="6" class="table-empty">
+            Aucune alerte détectée dans cette session.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    Les alertes sont conservées en mémoire pour la session de capture actuelle.
+  </p>
+</section>
+
+<section class="panel recent history-panel" id="history">
+  <p class="eyebrow">ARCHIVES</p>
+  <h2>Historique des captures</h2>
+  <p class="muted">Sessions enregistrées sur cet appareil.</p>
+
+  <div class="table-wrap">
+    <table class="packet-table history-table" aria-label="Historique des captures">
+      <thead>
+        <tr>
+          <th>DÉBUT</th>
+          <th>INTERFACE</th>
+          <th>ÉTAT</th>
+          <th>PAQUETS</th>
+          <th>VOLUME</th>
+          <th>FIN</th>
+        </tr>
+      </thead>
+      <tbody id="history-body">
+        <tr>
+          <td colspan="6" class="table-empty">
+            Chargement de l’historique…
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    L’historique conserve les informations de session et les résumés des paquets,
+    pas leur contenu brut.
+  </p>
+</section>
+{% endblock %}
